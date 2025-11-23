@@ -11,12 +11,20 @@ pygame.display.set_caption("Starter Game Example")
 clock = pygame.time.Clock()
 FPS = 60
 
+# --- Data sets ---
+famine_diseases=['Phytophthora infestans','Xanthomonas oryzae','Puccinia graminis','Fusarium oxysporum','Magnaporthe oryzae']
+animal_diseases=['Foot-and-Mouth Disease','Avian Influenza','Bovine Tuberculosis','Swine Fever', 'Rinderpest']
+
 # --- Player setup ---
 player_size = 40
 player_x = WIDTH // 2
 player_y = HEIGHT // 2
 player_speed = 5
 player_color = (50, 200, 255)
+
+# --- Game board setup ---
+starter_disease=random.choice(famine_diseases + animal_diseases)
+disease_type="Famine Disease" if starter_disease in famine_diseases else "Animal Disease"
 
 # --- Food setup ---
 food_size = 30
