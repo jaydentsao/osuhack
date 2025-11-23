@@ -12,6 +12,10 @@ background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 FPS = 60
 
+pending_action = None
+all_action = None
+
+
 # --- map setup ---
 MAX_ICONS = 57  
 map_overlays = []
@@ -206,7 +210,7 @@ news = [f'Famine detected in {infected_names_str}!']
 
 
 budget = 10000000000  # 10 billion starting budget
-MAX_PROFIT = 50_000_000  # profit per second when average health == 100%
+MAX_PROFIT = 1_000_000  # profit per second when average health == 100%
 budget_acc = 0.0
 
 # --- Food setup ---
@@ -218,16 +222,16 @@ health=100
     # ----------------------------------------
 
 class Button:
-    
-    def __init__(self, rect, text, callback, bg=(200, 200, 200), fg=(0, 0, 0)):
+    def __init__(self, rect, text, callback, bg=(200, 200, 200), fg=(0, 0, 0), text_below=None):
         self.rect = pygame.Rect(rect)
         self.text = text
         self.callback = callback
         self.bg = bg
         self.fg = fg
-        # cache to avoid re-rendering text each frame
+        self.text_below = text_below  # New attribute for text below the button
         self._cached_text = None
         self._cached_surface = None
+        self._cached_below_surface = None
 
     def draw(self, surf, font):
         mouse_pos = pygame.mouse.get_pos()
@@ -235,7 +239,7 @@ class Button:
         color = tuple(max(0, min(255, c - 50)) for c in self.bg) if hovered else self.bg
         pygame.draw.rect(surf, color, self.rect, border_radius=6)
 
-        # re-render only when text changes
+        # Render the button text
         if self.text != self._cached_text or self._cached_surface is None:
             self._cached_text = self.text
             self._cached_surface = font.render(self.text, True, self.fg)
@@ -244,11 +248,18 @@ class Button:
         txt_rect = txt.get_rect(center=self.rect.center)
         surf.blit(txt, txt_rect)
 
+        # Render the text below the button
+        if self.text_below:
+            if self.text_below != self._cached_below_surface:
+                self._cached_below_surface = font.render(self.text_below, True, self.fg)
+            below_txt = self._cached_below_surface
+            below_txt_rect = below_txt.get_rect(center=(self.rect.centerx, self.rect.bottom + 10))
+            surf.blit(below_txt, below_txt_rect)
+
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.rect.collidepoint(event.pos):
                 self.callback()
-
  # ----------------------------------------
     #               BUTTON CLASS END
     # ----------------------------------------
@@ -397,18 +408,11 @@ def make_close_button(popup):
     popup.buttons = [btn]
     return btn  
     
-popup_rect = ((WIDTH//4), (HEIGHT//4), 880, 440)
-popup_health = Popup(popup_rect, "Health", "Health information...", font_small)
-popup_hunger = Popup(popup_rect, "Hunger", "Hunger information...", font_small)
+popup_rect = ((WIDTH//4), (HEIGHT//4), WIDTH/2, HEIGHT/2)
 popup_wfp   = Popup(popup_rect, "World Food Programme", "WFP information...", font_small)
 popup_fao   = Popup(popup_rect, "Food and Agriculture Organization", "FAO information...", font_small)
 popup_country = Popup((WIDTH//2 - 200, HEIGHT//2 - 120, 400, 200), "Country", "Info", font_small)
 
-
-
-
-close_health = make_close_button(popup_health)
-close_hunger = make_close_button(popup_hunger)
 close_wfp = make_close_button(popup_wfp)
 close_fao = make_close_button(popup_fao)
 
@@ -416,47 +420,85 @@ close_fao = make_close_button(popup_fao)
 #             POPUP  END
 # ----------------------------------------
 
+
+
+# --- Info Box Setup ---
+
+class InfoBox:
+    def __init__(self, rect, text, bg=(200,200,200), fg=(0,0,0)):
+        self.rect = pygame.Rect(rect)
+        self.text = text
+        self.bg = bg
+        self.fg = fg
+        self._cached_text = None
+        self._cached_surface = None
+    
+    def draw(self, surf, font):
+        # draw without hover darkening so appearance stays constant
+        pygame.draw.rect(surf, self.bg, self.rect, border_radius=6)
+        if self.text != self._cached_text or self._cached_surface is None:
+            self._cached_text = self.text
+            self._cached_surface = font.render(self.text, True, self.fg)
+        txt = self._cached_surface
+        txt_rect = txt.get_rect(center=self.rect.center)
+        surf.blit(txt, txt_rect)
+
+# --- Info Box End ---
+
 newsImg = pygame.image.load("news.png")
 newsImg = pygame.transform.scale(newsImg, (ticker_height, ticker_height))
 
-wfpButton = Button((0, HEIGHT-100, WIDTH/5, 100), "World Food Programme", lambda: None)
+wfpButton = Button((0, HEIGHT-100, WIDTH/5, 100), "World Food Programme", lambda: popup_wfp.show(title=popup_wfp.title, text=popup_wfp.text, buttons=popup_wfp.buttons))
 #airdropButton = Button((, HEIGHT-100, WIDTH/5, 100), "Airdrop Food", lambda: None)
 
-faoButton = Button((WIDTH/5, HEIGHT-100, WIDTH/5, 100), "Food and Agriculture Organization", lambda: None)
-healthButton = Button((3*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), "Health", lambda: None)
-hungerButton = Button((4*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), "Hunger", lambda: None)
-
+faoButton = Button((WIDTH/5, HEIGHT-100, WIDTH/5, 100), "Food and Agriculture Organization",  lambda: popup_fao.show(title=popup_fao.title, text=popup_fao.text, buttons=popup_fao.buttons))
 
 wfpButton.callback = lambda pop=popup_wfp: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
-faoButton.callback = lambda: (popup_fao.show(title=popup_fao.title, text=popup_fao.text, buttons=[faobutton1, faobutton2, faobutton3]), 
-                              )
-healthButton.callback = lambda pop=popup_health: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
-hungerButton.callback = lambda pop=popup_hunger: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
+faoButton.callback = lambda: (popup_fao.show(title=popup_fao.title, text=popup_fao.text, buttons=[faobutton1, faobutton2, faobutton3]), )
+
+healthBox = InfoBox((3*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), f"Health: --", bg=(200,200,200))
+hungerBox = InfoBox((4*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), f"Hunger: --", bg=(200,200,200))
+
+
+
 
 def apply_action(action_name):
     global pending_action
     pending_action = action_name  # Set the pending action
     
 # ...existing code...
-def apply_action_to_country(action_name, country_index):
-    if action_name == "Airdrop Food to Selected Country":
-        country_famine[country_index] = max(0, country_famine[country_index] - 30)  # Reduce famine level
-        print(f"Airdropping food to {country_names[country_index]}")
-        # Example: Increase health or food supply
-        country_health[country_index] += 20  # Adjust as needed
-    elif action_name == "Action 2":
-        # Implement logic for Action 2
-        print(f"Applying Action 2 to {country_names[country_index]}")
-    elif action_name == "Action 3":
-        # Implement logic for Action 3
-        print(f"Applying Action 3 to {country_names[country_index]}")
+def apply_action_to_country(action_name, country_index,budget)->int:
+    if action_name == "Rapidly Airdrop Food to Selected Country" and budget >= 1500000000:
+        country_famine[country_index] = max(70,country_famine[country_index]+40)  # Reduce famine level
+        return budget-1500000000  # Deduct cost
+    elif action_name == "Ship Food to Selected Country" and budget >= 750000000:
+        country_famine[country_index] = max(70,country_famine[country_index]+20)  # Reduce famine level
+        return budget-750000000  # Deduct cost
+    elif action_name == "Distribute Food to Countries in Need" and budget >= 2500000000:  # Deduct cost
+        for i in range(58):
+            country_famine[i] = max(70,country_famine[i]+20)  # Reduce famine level
+        return budget-2500000000
+    return budget
 
-faobutton1 = Button(((WIDTH/4)+50, (HEIGHT/4) + 50, 100, 50), "Airdrop Food to Selected Country", lambda: apply_action("Airdrop Food to Selected Country"))
-faobutton2 = Button(((WIDTH/4)+200, (HEIGHT/4) + 50, 100, 30), "Action 2", lambda: apply_action("Action 2"))
-faobutton3 = Button(((WIDTH/4)+350, (HEIGHT/4) + 50, 100, 30), "Action 3", lambda: apply_action("Action 3"))
+faobutton1 = Button(((WIDTH/2) - 170, (HEIGHT/4) + 70, 320, 30), "Rapidly Airdrop Food to Selected Country", lambda: apply_action("Rapidly Airdrop Food to Selected Country", text_below="Quickly send a large amount of food to the selected country. Cost: $1,500,000,000"))
+faobutton2 = Button(((WIDTH/2) - 140, (HEIGHT/4) + 170, 250, 30), "Ship Food to Selected Country", lambda: apply_action("Ship Food to Selected Country", text_below="Send a moderate amount of food to the selected country. Cost: 750,000,000"))
+faobutton3 = Button(((WIDTH/2) - 155, (HEIGHT/4) + 270, 290, 30), "Distribute Food to Countries in Need", lambda: apply_action("Distribute Food to Countries in Need", text_below="Evenly distribute a large amount of food to all countries. Cost: $2,500,000,000"))
+
+faobutton1.callback = lambda: (popup_fao.hide(), apply_action("Rapidly Airdrop Food to Selected Country"))
+faobutton2.callback = lambda: (popup_fao.hide(), apply_action("Ship Food to Selected Country"))
+faobutton3.callback = lambda: (popup_fao.hide(), apply_action("Distribute Food to Countries in Need"))
+
+wfpbutton1 = Button(((WIDTH/2) - 170, (HEIGHT/4) + 70, 320, 30), "Grow New Crops in Selected Co", lambda: apply_action("Rapidly Airdrop Food to Selected Country", text_below="Quickly send a large amount of food to the selected country. Cost: $1,500,000,000"))
+wfpbutton2 = Button(((WIDTH/2) - 140, (HEIGHT/4) + 170, 250, 30), "Ship Food to Selected Country", lambda: apply_action("Ship Food to Selected Country", text_below="Send a moderate amount of food to the selected country. Cost: 750,000,000"))
+wfpbutton3 = Button(((WIDTH/2) - 155, (HEIGHT/4) + 270, 290, 30), "Distribute Food to Countries in Need", lambda: apply_action("Distribute Food to Countries in Need", text_below="Evenly distribute a large amount of food to all countries. Cost: $2,500,000,000"))
+
+wfpbutton1.callback = lambda: (popup_fao.hide(), apply_action("Rapidly Airdrop Food to Selected Country"))
+wfpbutton2.callback = lambda: (popup_fao.hide(), apply_action("Ship Food to Selected Country"))
+wfpbutton3.callback = lambda: (popup_fao.hide(), apply_action("Distribute Food to Countries in Need"))
 
 
-budgetButton = Button((2*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), f"Budget: {budget}", lambda: None)
+
+budgetButton = Button((2*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), f"Budget: {budget:,}", lambda: None)
 popup_budget = Popup(popup_rect, "Budget", "Budget is currently stable.", font_small)
 budgetButton.callback = lambda pop=popup_budget: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
 
@@ -468,7 +510,6 @@ budgetButton.callback = lambda pop=popup_budget: pop.show(title=pop.title, text=
 running = True
 while running:
     dt = clock.tick(FPS) / 1000.0  # delta seconds
-    pending_action = None
 
     # ----------------------------------------
     #             INPUT HANDLING
@@ -476,17 +517,18 @@ while running:
 
 
 
-
     # compute average world health (clamp 0..100) and update profit_rate accordingly
-    if country_health:
-        clamped = [max(0, min(100, h)) for h in country_health]
-        average_health = sum(clamped) / len(clamped)
-    else:
-        average_health = 100.0
+    
+    for i in range(58):
+        if(country_health[i]>100):
+            country_health[i]=100
+            
+    average_health = sum(country_health)/ len(country_health)
+    average_famine= 70 - (sum(country_famine)/len(country_famine))
+    total_average_hp=average_health + average_famine
 
     # profit scales linearly: 0% -> 0, 100% -> MAX_PROFIT
     profit_rate = int((average_health / 100.0) * MAX_PROFIT)
-    print(average_health)
 
     # apply profit per whole second using accumulator (handles fractional dt)
     budget_acc += dt
@@ -499,7 +541,9 @@ while running:
     popup_budget.title = f"Budget: ${budget:,}"
     popup_budget.text = f"Profit rate: ${profit_rate:,}/s"
     budgetButton.text = f"Budget: ${budget:,}"
-# ...existing code...
+    
+    
+
 
 
     for event in pygame.event.get():
@@ -507,12 +551,11 @@ while running:
             running = False
         # If any popup is active, route events to it and skip other UI handling
         active_popup = None
-        for p in (popup_health, popup_hunger, popup_budget, popup_wfp, popup_fao, popup_country):
+        for p in (popup_budget, popup_wfp, popup_fao, popup_country):
             if p.active:
                 active_popup = p
                 break
         if active_popup:
-            
             active_popup.handle_event(event)
             continue
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -527,13 +570,15 @@ while running:
                 if 0 <= idx <= MAX_ICONS:
                     name = country_names.get(idx, f"Unknown ({idx})")
                     
+                
+                        
+         
                     if pending_action:
                         # Apply the action to the selected country
-                        apply_action_to_country(pending_action, idx)
+                        budget=apply_action_to_country(pending_action, idx,budget)
                         pending_action = None  # Reset pending action
                         print(f"Applied '{pending_action}' to {name}")
                     else:
-                    
                     #INPUT HEALTH VALUE AND FAMINE STATUS
                         health_val = country_health[idx]+country_famine[idx]
                         famine = "Yes" if idx in infected_countries else "No"
@@ -547,8 +592,6 @@ while running:
         wfpButton.handle_event(event)
         faoButton.handle_event(event)
         budgetButton.handle_event(event)
-        healthButton.handle_event(event)
-        hungerButton.handle_event(event)
         
 
     
@@ -577,10 +620,15 @@ while running:
     for i in range(58):
         if random.randint(0, 50)==1:
             country_famine[i]= max(0, country_famine[i]-1) if i in infected_countries else min(70, country_famine[i]+1)
+        if i in infected_countries and random.randint(0, 100)==1:
+            country_health[i]= max(0, country_health[i]-1)
 
     # ----------------------------------------
     #               DRAWING
     # ----------------------------------------
+
+    healthBox = InfoBox((3*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), f"Health: {int((100*average_health)/30)}", bg=(200,200,200))
+    hungerBox = InfoBox((4*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), f"Hunger: {int((100*average_famine)/70)}", bg=(200,200,200))
 
     # Draw background
     screen.blit(background, (0, 0))
@@ -612,14 +660,14 @@ while running:
     wfpButton.draw(screen, font_small)
     faoButton.draw(screen, font_small)
     budgetButton.draw(screen, font_small)
-    healthButton.draw(screen, font_small)
-    hungerButton.draw(screen, font_small)
+    healthBox.draw(screen, font_small)
+    hungerBox.draw(screen, font_small)    
     
     
 
     news_ticker.draw(screen)
     
-    for p in (popup_health, popup_hunger, popup_budget, popup_wfp, popup_fao, popup_country):
+    for p in (popup_budget, popup_wfp, popup_fao, popup_country):
         p.draw(screen)
 
 
