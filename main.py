@@ -7,7 +7,8 @@ pygame.init()
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Starter Game Example")
-pygame.display.set_background("51101cb559791d1372e717a865d9ae39.jpg")
+background = pygame.image.load("51101cb559791d1372e717a865d9ae39.jpg")
+background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 FPS = 60
 
@@ -56,12 +57,16 @@ while running:
     # ----------------------------------------
 
     # Draw background
-    screen.fill((20, 20, 20))
+    screen.blit(background, (0, 0))
 
-    # Draw map
-    
+    # Draw player and food
+    pygame.draw.rect(screen, player_color, player_rect)
+    pygame.draw.rect(screen, food_color, food_rect)
 
-    # Draw buttons
+    # Draw score
+    font = pygame.font.SysFont(None, 40)
+    score_text = font.render(f"Score: {score}", True, (255, 255, 255))
+    screen.blit(score_text, (10, 10))
 
     # Update display
     pygame.display.flip()
