@@ -2,6 +2,7 @@ import pygame
 import random
 import sys
 import matplotlib as mpl
+import numpy as np
 from PIL import Image
 
 # --- Setup ---
@@ -16,9 +17,9 @@ clock = pygame.time.Clock()
 FPS = 60
 
 # --- map setup ---
-MAX_ICONS = 10  
+MAX_ICONS = 57  
 map_overlays = []
-for i in range(1, MAX_ICONS + 1):
+for i in range(0, MAX_ICONS + 1):
     path = f"map_images/{i}.png"
     try:
         img = pygame.image.load(path).convert_alpha()
@@ -30,7 +31,7 @@ for i in range(1, MAX_ICONS + 1):
     red_img.fill((255, 0, 0, 255), special_flags=pygame.BLEND_RGBA_MULT)
     red_img = pygame.transform.scale(red_img, (WIDTH, HEIGHT))
     # apply ~10% global opacity
-    red_img.set_alpha(int(255 * 0.90))
+    red_img.set_alpha(int(255 * 0.30))
     map_overlays.append(red_img)
 
 # --- Data sets ---
@@ -47,7 +48,14 @@ country_of_origin=random.randint(0, 58)
 countries=[100]*58
 countries_coordinates=[]
 for country in range(58):
-    break
+    img = Image.open(f"map_images/{country}.png").convert("RGBA")
+    arr=np.array(img)
+    alpha = arr[:, :, 3]
+    mask = alpha > 0
+    ys, xs = np.where(mask)
+    centroid = [int(xs.mean()*2), int(ys.mean()*2)]
+    countries_coordinates.append(centroid)
+
 news=[f'New outbreak of {starter_disease} ({disease_type}) reported!']
 
 # --- Food setup ---
@@ -118,8 +126,7 @@ class NewsTicker:
         self.offset = 0.0
 
     def update(self, dt):
-        if self.base_width <= self.rect.width:
-            # no need to scroll if the full text fits
+        if self.base_width == 0:
             return
         self.offset += self.speed * dt
         # wrap offset so it never grows unbounded
@@ -151,11 +158,11 @@ news_ticker = NewsTicker((WIDTH/4, 0, WIDTH/2, ticker_height), news, font_small,
 newsImg = pygame.image.load("news.png")
 newsImg = pygame.transform.scale(newsImg, (120, 120))
 
-wfpButton = Button((0, HEIGHT, WIDTH/5, 100), "World Food Programme", lambda: None)
-faoButton = Button((WIDTH/5, HEIGHT, WIDTH/5, 100), "Food and Agriculture Organization", lambda: None)
+wfpButton = Button((0, HEIGHT-100, WIDTH/5, 100), "World Food Programme", lambda: None)
+faoButton = Button((WIDTH/5, HEIGHT-100, WIDTH/5, 100), "Food and Agriculture Organization", lambda: None)
 
-hungerButton = Button((4*(WIDTH/5), HEIGHT, WIDTH/5, 100), "Hunger", lambda: None)
-healthButton = Button((3*(WIDTH/5), HEIGHT, WIDTH/5, 100), "Health", lambda: None)
+hungerButton = Button((4*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), "Hunger", lambda: None)
+healthButton = Button((3*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), "Health", lambda: None)
 
     
 
@@ -179,7 +186,7 @@ while running:
         hungerButton.handle_event(event)
             
 
-            
+    
     # ----------------------------------------
     #              GAME LOGIC
     # ----------------------------------------
@@ -195,18 +202,18 @@ while running:
         screen.blit(overlay, (0, 0))
         
         
-        
+    wfpButton.draw(screen, font_small)
+    faoButton.draw(screen, font_small)
+    healthButton.draw(screen, font_small)
+    hungerButton.draw(screen, font_small)
+
     news_ticker.draw(screen)
     screen.blit(newsImg, (10, 0))
     
     
 
         
-    wfpButton.draw(screen, font_small)
-    faoButton.draw(screen, font_small)
-    healthButton.draw(screen, font_small)
-    hungerButton.draw(screen, font_small)
-
+    
 
 
     # Draw menus
