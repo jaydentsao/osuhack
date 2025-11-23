@@ -232,21 +232,25 @@ class Button:
         self._cached_text = None
         self._cached_surface = None
         self._cached_below_surface = None
-
+        
     def draw(self, surf, font):
         mouse_pos = pygame.mouse.get_pos()
         hovered = self.rect.collidepoint(mouse_pos)
         color = tuple(max(0, min(255, c - 50)) for c in self.bg) if hovered else self.bg
         pygame.draw.rect(surf, color, self.rect, border_radius=6)
 
-        # Render the button text
-        if self.text != self._cached_text or self._cached_surface is None:
-            self._cached_text = self.text
-            self._cached_surface = font.render(self.text, True, self.fg)
+        # Split the text into lines
+        lines = self.text.splitlines()
+        line_height = font.get_linesize()
 
-        txt = self._cached_surface
-        txt_rect = txt.get_rect(center=self.rect.center)
-        surf.blit(txt, txt_rect)
+        # Render each line
+        for i, line in enumerate(lines):
+            if line != self._cached_text or self._cached_surface is None:
+                self._cached_text = line
+                self._cached_surface = font.render(line, True, self.fg)
+            txt = self._cached_surface
+            txt_rect = txt.get_rect(center=(self.rect.centerx, self.rect.y + 10 + i * line_height))
+            surf.blit(txt, txt_rect)
 
         # Render the text below the button
         if self.text_below:
@@ -255,6 +259,7 @@ class Button:
             below_txt = self._cached_below_surface
             below_txt_rect = below_txt.get_rect(center=(self.rect.centerx, self.rect.bottom + 10))
             surf.blit(below_txt, below_txt_rect)
+    
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -512,17 +517,17 @@ def apply_action_to_country(action_name, country_index,budget)->int:
     elif action_name == "Ship Food to Selected Country" and budget >= 750000000:
         country_famine[country_index] = min(70,country_famine[country_index]+20)  # Reduce famine level
         return budget-750000000  # Deduct cost
-    elif action_name == "Distribute Food to Countries in Need" and budget >= 2500000000:  # Deduct cost
+    elif action_name == "Distribute Food to Countries in Need" and budget >= 3000000000:  # Deduct cost
         for i in range(58):
             country_famine[i] = min(70,country_famine[i]+20)  # Reduce famine level
-        return budget-2500000000
+        return budget-3000000000
     
     elif action_name == "Subsidize Farming" and budget >= 1500000000:
         country_health[country_index] = min(30,country_health[country_index]+20)  # Increase health level
         return budget-1500000000  # Deduct cost
         
-    elif action_name == "Cure Plant/Animal Disease" and budget >= 7500000000:
-        country_health[country_index] = min(30,country_health[country_index]+10)  # Increase health level
+    elif action_name == "Cure Plant/Animal Disease in Selected Country" and budget >= 7500000000 and country_index in infected_countries:
+        infected_countries.remove(country_index) # Increase health level
         return budget-7500000000  # Deduct cost
         
     elif action_name == "Implement Global Agricultural Practice Programs" and budget >= 2000000000:
@@ -533,28 +538,23 @@ def apply_action_to_country(action_name, country_index,budget)->int:
     
     return budget
 
-faobutton1 = Button(((WIDTH/2) - 170, (HEIGHT/4) + 70, 320, 30), "Rapidly Airdrop Food to Selected Country", lambda: apply_action("Rapidly Airdrop Food to Selected Country", text_below="Quickly send a large amount of food to the selected country. Cost: $1,500,000,000"))
-faobutton2 = Button(((WIDTH/2) - 140, (HEIGHT/4) + 170, 250, 30), "Ship Food to Selected Country", lambda: apply_action("Ship Food to Selected Country", text_below="Send a moderate amount of food to the selected country. Cost: 750,000,000"))
-faobutton3 = Button(((WIDTH/2) - 155, (HEIGHT/4) + 270, 290, 30), "Distribute Food to Countries in Need", lambda: apply_action("Distribute Food to Countries in Need", text_below="Evenly distribute a large amount of food to all countries. Cost: $2,500,000,000"))
+faobutton1 = Button(((WIDTH/2) - 170, (HEIGHT/4) + 70, 320, 30), 'Rapidly Airdrop Food to Selected Country', lambda: apply_action("Rapidly Airdrop Food to Selected Country"))
+faobutton2 = Button(((WIDTH/2) - 140, (HEIGHT/4) + 170, 250, 30), 'Ship Food to Selected Country', lambda: apply_action("Ship Food to Selected Country"))
+faobutton3 = Button(((WIDTH/2) - 155, (HEIGHT/4) + 270, 290, 30), "Distribute Food to Countries in Need", lambda: apply_action("Distribute Food to Countries in Need"))
 
 faobutton1.callback = lambda: (popup_fao.hide(), apply_action("Rapidly Airdrop Food to Selected Country"))
 faobutton2.callback = lambda: (popup_fao.hide(), apply_action("Ship Food to Selected Country"))
 faobutton3.callback = lambda: (popup_fao.hide(), apply_action("Distribute Food to Countries in Need"))
 
-wfpbutton1 = Button(((WIDTH/2) - 170, (HEIGHT/4) + 70, 136, 30), "Subsidize Farming", lambda: apply_action("Subsidize Farming", text_below="Subsidize Farming and Grow More Crops in Selected Country. Cost: $1,500,000,000"))
-wfpbutton2 = Button(((WIDTH/2) - 140, (HEIGHT/4) + 170, 360, 30), "Cure Plant/Animal Disease in Selected Country", lambda: apply_action("Cure Plant/Animal Disease in Selected Country", text_below="Cure the animal or plant disease in the selected country, eliminating the famine. Cost: $7,500,000,000"))
-wfpbutton3 = Button(((WIDTH/2) - 155, (HEIGHT/4) + 270, 400, 30), "Implement Global Agricultural Education Programs", lambda: apply_action("Implement Global Agricultural Education Programs", text_below="Teaches agricultural practices globally to limit disease outbreaks and improve food production. Cost: $2,000,000,000"))
+wfpbutton1 = Button(((WIDTH/2) - 140, (HEIGHT/4) + 70, 250, 30), "Subsidize Farming", lambda: apply_action("Subsidize Farming"))
+wfpbutton2 = Button(((WIDTH/2) - 200, (HEIGHT/4) + 170, 400, 30), "Cure Plant/Animal Disease in Selected Country", lambda: apply_action("Cure Plant/Animal Disease in Selected Country"))
+wfpbutton3 = Button(((WIDTH/2) - 200, (HEIGHT/4) + 270, 400, 30), "Implement Global Agricultural Education Programs", lambda: apply_action("Implement Global Agricultural Education Programs"))
 
-wfpbutton1.callback = lambda: (popup_fao.hide(), apply_action("Subsidize Farming"))
-wfpbutton2.callback = lambda: (popup_fao.hide(), apply_action("Cure Plant/Animal Disease in Selected Country"))
-wfpbutton3.callback = lambda: (popup_fao.hide(), apply_action("Implement Global Agricultural Practice Programs"))
+wfpbutton1.callback = lambda: (popup_wfp.hide(), apply_action("Subsidize Farming"))
+wfpbutton2.callback = lambda: (popup_wfp.hide(), apply_action("Cure Plant/Animal Disease in Selected Country"))
+wfpbutton3.callback = lambda: (popup_wfp.hide(), apply_action("Implement Global Agricultural Education Programs"))
 
-# Create a textbox for the FAO popup
-fao_textbox1 = Textbox(
-    rect=(popup_fao.rect.x + 20, popup_fao.rect.y + popup_fao.rect.height - 80, popup_fao.rect.width - 40, 40),
-    font=font_small,
-    text="Quickly send a large amount of food to the selected country. Cost: $1,500,000,000"
-)
+
 
 budgetButton = Button((2*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), f"Budget: {budget:,}", lambda: None)
 popup_budget = Popup(popup_rect, "Budget", "Budget is currently stable.", font_small)
@@ -643,7 +643,6 @@ while running:
                         body = f"Health: {health_val}\nFamine?: {famine}"
                     # position popup slightly offset from click so cursor doesn't cover it
                         popup_country.show(title=name, text=body, buttons=popup_country.buttons, pos=(mx + 12, my + 12))
-                        print(f"Clicked country: {name}")
                 #INPUT HEALTH VALUE AND FAMINE STATUS ABOVE
 
             
