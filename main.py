@@ -1,18 +1,37 @@
 import pygame
 import random
 import sys
-
+import matplotlib as mpl
+from PIL import Image
 
 # --- Setup ---
 pygame.init()
 
-WIDTH, HEIGHT = 700, 360
+WIDTH, HEIGHT = 1400, 720
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Famine Inc.")
 background = pygame.image.load("map.jpeg")
 background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 FPS = 60
+
+# --- map setup ---
+MAX_ICONS = 10  
+map_overlays = []
+for i in range(1, MAX_ICONS + 1):
+    path = f"map_images/{i}.png"
+    try:
+        img = pygame.image.load(path).convert_alpha()
+    except Exception as e:
+        print(f"[overlay] failed to load {path}: {e}")
+        continue
+    # tint to solid red while preserving per-pixel alpha
+    red_img = img.copy()
+    red_img.fill((255, 0, 0, 255), special_flags=pygame.BLEND_RGBA_MULT)
+    red_img = pygame.transform.scale(red_img, (WIDTH, HEIGHT))
+    # apply ~10% global opacity
+    red_img.set_alpha(int(255 * 0.90))
+    map_overlays.append(red_img)
 
 # --- Data sets ---
 agriculture_diseases=['Phytophthora infestans','Xanthomonas oryzae','Puccinia graminis','Fusarium oxysporum','Magnaporthe oryzae']
@@ -24,14 +43,21 @@ animal_diseases=['Foot-and-Mouth Disease','Avian Influenza','Bovine Tuberculosis
 # --- Game board setup ---
 starter_disease=random.choice(agriculture_diseases + animal_diseases)
 disease_type="Famine Disease" if starter_disease in agriculture_diseases else "Animal Disease"
-country_of_origin=random.randint(1, 58)
-news=['New outbreak of {starter_disease} ({disease_type}) reported!']
+country_of_origin=random.randint(0, 58)
+countries=[100]*58
+countries_coordinates=[]
+for country in range(58):
+    break
+news=[f'New outbreak of {starter_disease} ({disease_type}) reported!']
 
 # --- Food setup ---
 hunger=100
 health=100
 
-# --- Button class ---
+ # ----------------------------------------
+    #               BUTTON CLASS
+    # ----------------------------------------
+
 class Button:
     def __init__(self, rect, text, callback, bg=(200,200,200), fg=(0,0,0)):
         self.rect = pygame.Rect(rect)
@@ -54,8 +80,9 @@ class Button:
             if self.rect.collidepoint(event.pos):
                 self.callback()
 
-# --- Button class end
-
+ # ----------------------------------------
+    #               BUTTON CLASS END
+    # ----------------------------------------
 # ----------------------------------------
 #             NEWS TICKER
 # ----------------------------------------
@@ -101,7 +128,7 @@ class NewsTicker:
 
     def draw(self, surf):
         # background bar
-        pygame.draw.rect(surf, (10,10,10), self.rect)
+        pygame.draw.rect(surf, (50,50,50), self.rect)
         # clip drawing to the bar rect
         prev_clip = surf.get_clip()
         surf.set_clip(self.rect)
@@ -116,16 +143,25 @@ class NewsTicker:
 
 
 ticker_height = 30
-news_ticker = NewsTicker((0, 0, WIDTH, ticker_height), news, font_small, speed=80, fg=(255,230,0))
+news_ticker = NewsTicker((WIDTH/4, 0, WIDTH/2, ticker_height), news, font_small, speed=80, fg=(255,255,255))
 # ----------------------------------------
 #             NEWS TICKER END
 # ----------------------------------------
 
+newsImg = pygame.image.load("news.png")
+newsImg = pygame.transform.scale(newsImg, (120, 120))
+
+wfpButton = Button((0, HEIGHT, WIDTH/5, 100), "World Food Programme", lambda: None)
+faoButton = Button((WIDTH/5, HEIGHT, WIDTH/5, 100), "Food and Agriculture Organization", lambda: None)
+
+hungerButton = Button((4*(WIDTH/5), HEIGHT, WIDTH/5, 100), "Hunger", lambda: None)
+healthButton = Button((3*(WIDTH/5), HEIGHT, WIDTH/5, 100), "Health", lambda: None)
+
+    
 
 # --- Game loop ---
 running = True
 while running:
-    clock.tick(FPS)
     dt = clock.tick(FPS) / 1000.0  # delta seconds
 
     # ----------------------------------------
@@ -136,6 +172,13 @@ while running:
             running = False
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse_x, mouse_y = event.pos
+            
+        wfpButton.handle_event(event)
+        faoButton.handle_event(event)
+        healthButton.handle_event(event)
+        hungerButton.handle_event(event)
+            
+
             
     # ----------------------------------------
     #              GAME LOGIC
@@ -148,15 +191,28 @@ while running:
 
     # Draw background
     screen.blit(background, (0, 0))
+    for overlay in map_overlays:
+        screen.blit(overlay, (0, 0))
+        
+        
+        
+    news_ticker.draw(screen)
+    screen.blit(newsImg, (10, 0))
+    
+    
 
-    newsButton = Button((10, 10, 200, 40), "News", lambda: print("\n".join(news)), bg=(100, 200, 100), fg=(255, 255, 255))
+        
+    wfpButton.draw(screen, font_small)
+    faoButton.draw(screen, font_small)
+    healthButton.draw(screen, font_small)
+    hungerButton.draw(screen, font_small)
+
+
 
     # Draw menus
     # if menu is open, draw
-
-    # Draw player and food
-
-    # Draw score
+    
+   
 
     # Update display
     pygame.display.flip()
