@@ -1,10 +1,5 @@
 import pygame
 import random
-import sys
-import matplotlib as mpl
-import numpy as np
-from PIL import Image
-import math
 
 # --- Setup ---
 pygame.init()
@@ -45,6 +40,12 @@ for idx, mask in enumerate(map_masks):
     # mask.to_surface paints setcolor where mask present
     surf = mask.to_surface(setcolor=(idx + 1, 0, 0, 255), unsetcolor=(0, 0, 0, 0))
     id_map.blit(surf, (0, 0))
+
+hover_highlights = []
+for mask in map_masks:
+    # create a single, reusable highlight surface (soft gray + alpha)
+    surf = mask.to_surface(setcolor=(220, 220, 220, 160), unsetcolor=(0, 0, 0, 0)).convert_alpha()
+    hover_highlights.append(surf)
 
 # --- Data sets ---
 agriculture_diseases=['Phytophthora infestans','Xanthomonas oryzae','Puccinia graminis','Fusarium oxysporum','Magnaporthe oryzae']
@@ -224,14 +225,22 @@ class Button:
         self.callback = callback
         self.bg = bg
         self.fg = fg
+        # cache to avoid re-rendering text each frame
+        self._cached_text = None
+        self._cached_surface = None
 
     def draw(self, surf, font):
         mouse_pos = pygame.mouse.get_pos()
         hovered = self.rect.collidepoint(mouse_pos)
-        # Adjust the shading effect for hover
         color = tuple(max(0, min(255, c - 50)) for c in self.bg) if hovered else self.bg
         pygame.draw.rect(surf, color, self.rect, border_radius=6)
-        txt = font.render(self.text, True, self.fg)
+
+        # re-render only when text changes
+        if self.text != self._cached_text or self._cached_surface is None:
+            self._cached_text = self.text
+            self._cached_surface = font.render(self.text, True, self.fg)
+
+        txt = self._cached_surface
         txt_rect = txt.get_rect(center=self.rect.center)
         surf.blit(txt, txt_rect)
 
@@ -388,7 +397,7 @@ def make_close_button(popup):
     popup.buttons = [btn]
     return btn  
     
-popup_rect = (WIDTH//4, HEIGHT//4, 880, 440)
+popup_rect = ((WIDTH//4), (HEIGHT//4), 880, 440)
 popup_health = Popup(popup_rect, "Health", "Health information...", font_small)
 popup_hunger = Popup(popup_rect, "Hunger", "Hunger information...", font_small)
 popup_wfp   = Popup(popup_rect, "World Food Programme", "WFP information...", font_small)
@@ -419,7 +428,7 @@ hungerButton = Button((4*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), "Hunger", lambda:
 
 
 wfpButton.callback = lambda pop=popup_wfp: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
-faoButton.callback = lambda: (popup_fao.show(title=popup_fao.title, text=popup_fao.text, buttons=popup_fao.buttons), 
+faoButton.callback = lambda: (popup_fao.show(title=popup_fao.title, text=popup_fao.text, buttons=[faobutton1, faobutton2, faobutton3]), 
                               )
 healthButton.callback = lambda pop=popup_health: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
 hungerButton.callback = lambda pop=popup_hunger: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
@@ -431,7 +440,7 @@ def apply_action(action_name):
 # ...existing code...
 def apply_action_to_country(action_name, country_index):
     if action_name == "Airdrop Food to Selected Country":
-        # Implement the logic for airdropping food
+        country_famine[country_index] = max(0, country_famine[country_index] - 30)  # Reduce famine level
         print(f"Airdropping food to {country_names[country_index]}")
         # Example: Increase health or food supply
         country_health[country_index] += 20  # Adjust as needed
@@ -442,17 +451,16 @@ def apply_action_to_country(action_name, country_index):
         # Implement logic for Action 3
         print(f"Applying Action 3 to {country_names[country_index]}")
 
-faobutton1 = Button((50, 100, 100, 30), "Airdrop Food to Selected Country", lambda: apply_action("Airdrop Food to Selected Country"))
-faobutton2 = Button((150, 100, 100, 30), "Action 2", lambda: apply_action("Action 2"))
-faobutton3 = Button((250, 100, 100, 30), "Action 3", lambda: apply_action("Action 3"))
+faobutton1 = Button(((WIDTH/4)+50, (HEIGHT/4) + 50, 100, 50), "Airdrop Food to Selected Country", lambda: apply_action("Airdrop Food to Selected Country"))
+faobutton2 = Button(((WIDTH/4)+200, (HEIGHT/4) + 50, 100, 30), "Action 2", lambda: apply_action("Action 2"))
+faobutton3 = Button(((WIDTH/4)+350, (HEIGHT/4) + 50, 100, 30), "Action 3", lambda: apply_action("Action 3"))
 
 
 budgetButton = Button((2*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), f"Budget: {budget}", lambda: None)
-popup_budget = Popup(popup_rect, f"Budget: {budget}", "Budget is currently stable.", font_small)
+popup_budget = Popup(popup_rect, "Budget", "Budget is currently stable.", font_small)
 budgetButton.callback = lambda pop=popup_budget: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
 
 # --- Game loop ---
-
 
 
 
@@ -468,10 +476,6 @@ while running:
 
 
 
-    #update health
-    for i in infected_countries:
-        if random.randint(0, 100)<30:
-            country_famine[i]=-1
 
     # compute average world health (clamp 0..100) and update profit_rate accordingly
     if country_health:
@@ -482,6 +486,7 @@ while running:
 
     # profit scales linearly: 0% -> 0, 100% -> MAX_PROFIT
     profit_rate = int((average_health / 100.0) * MAX_PROFIT)
+    print(average_health)
 
     # apply profit per whole second using accumulator (handles fractional dt)
     budget_acc += dt
@@ -491,8 +496,10 @@ while running:
         budget_acc -= secs
 
     # update popup/button labels to reflect latest values
-    popup_budget.text = f"Budget is currently stable.\nProfit rate: ${profit_rate:,}/s"
+    popup_budget.title = f"Budget: ${budget:,}"
+    popup_budget.text = f"Profit rate: ${profit_rate:,}/s"
     budgetButton.text = f"Budget: ${budget:,}"
+# ...existing code...
 
 
     for event in pygame.event.get():
@@ -505,6 +512,7 @@ while running:
                 active_popup = p
                 break
         if active_popup:
+            
             active_popup.handle_event(event)
             continue
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -527,7 +535,7 @@ while running:
                     else:
                     
                     #INPUT HEALTH VALUE AND FAMINE STATUS
-                        health_val = country_health[idx]+country_famine[idx] if idx < len(country_health) else 100
+                        health_val = country_health[idx]+country_famine[idx]
                         famine = "Yes" if idx in infected_countries else "No"
                         body = f"Health: {health_val}\nFamine?: {famine}"
                     # position popup slightly offset from click so cursor doesn't cover it
@@ -550,7 +558,7 @@ while running:
     news_ticker.update(dt)
 
     # infect
-    if random.randint(0, 300)==1:
+    if random.randint(0, 900)==1:
         neighbors=countries_neighbors.get(random.choice(infected_countries))
         new_infected=random.choice(neighbors)
         if new_infected not in infected_countries:
@@ -558,12 +566,17 @@ while running:
             news.append(f'Famine detected in {country_names[new_infected]}! ')
             news_ticker.refresh()
     elif random.randint(0, 5000)==1:
-        continue
+        new_infected=random.randint(0, 58)
+        if new_infected not in infected_countries:
+            infected_countries.append(new_infected)
+            disease=random.choice(agriculture_diseases + animal_diseases)
+            news.append(f'Disease {disease} has caused famine in {country_names[new_infected]}!')
+            news_ticker.refresh()
 
     #update health
     for i in range(58):
-        if random.randint(0, 100)<30:
-            country_famine[i]= min(0, country_famine[i]-1) if i in infected_countries else max(70, country_famine[i]+1)
+        if random.randint(0, 50)==1:
+            country_famine[i]= max(0, country_famine[i]-1) if i in infected_countries else min(70, country_famine[i]+1)
 
     # ----------------------------------------
     #               DRAWING
@@ -574,28 +587,26 @@ while running:
     screen.blit(newsImg, (WIDTH/4 - ticker_height, 0))
 
     for idx, overlay in enumerate(map_overlays):
-        health_val = country_health[idx]+country_famine[idx] if idx < len(country_health) else 100
+        health_val = country_health[idx] + country_famine[idx] if idx < len(country_health) else 100
         # linear mapping: health 100 -> 0 alpha, health 0 -> 255 alpha
         alpha = int((100.0 - health_val) / 100.0 * 255.0)
         alpha = max(0, min(255, alpha))
+        if alpha == 0:
+            # skip blitting entirely when fully clear
+            continue
         tmp = overlay.copy()
         tmp.set_alpha(alpha)
         screen.blit(tmp, (0, 0))
 
     mouse_x, mouse_y = pygame.mouse.get_pos()
-    
     mouse_x = max(0, min(WIDTH - 1, mouse_x))
     mouse_y = max(0, min(HEIGHT - 1, mouse_y))
-    
-    
+
     col = id_map.get_at((mouse_x, mouse_y))
     hover_idx = col.r - 1
     if 0 <= hover_idx <= MAX_ICONS and hover_idx < len(map_masks):
-        # draw a softer, less-bright highlight using the mask rather than copying the red overlay
-        # use a light-gray color with moderate alpha (adjust as needed)
-        mask = map_masks[hover_idx]
-        highlight = mask.to_surface(setcolor=(220, 220, 220, 160), unsetcolor=(0, 0, 0, 0)).convert_alpha()
-        screen.blit(highlight, (0, 0))
+        # use the precomputed highlight surface
+        screen.blit(hover_highlights[hover_idx], (0, 0))
         
         
     wfpButton.draw(screen, font_small)
@@ -603,10 +614,12 @@ while running:
     budgetButton.draw(screen, font_small)
     healthButton.draw(screen, font_small)
     hungerButton.draw(screen, font_small)
+    
+    
 
     news_ticker.draw(screen)
     
-    for p in (popup_health, popup_hunger, popup_budget, popup_wfp, popup_fao,popup_country):
+    for p in (popup_health, popup_hunger, popup_budget, popup_wfp, popup_fao, popup_country):
         p.draw(screen)
 
 
