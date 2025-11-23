@@ -60,7 +60,9 @@ country_of_origin=random.randint(0, 58)
 infected_countries=[country_of_origin]
 initial_spread=random.randint(0,2)
 
-country_health=[100]*58
+country_fed=[True]*58
+country_famine=[70]*58
+country_health=[30]*58
 country_names = {
     0: "Argentina",
     1: "Bolivia",
@@ -193,16 +195,18 @@ for i in range(initial_spread):
         if neighbors in infected_countries:
             break
 
-
+infected_names = []
 for i in infected_countries:
-    country_health[i]=random.randint(20, 60)
+    country_fed[i] = False
+    country_famine[i] = random.randint(20, 60)
+    infected_names.append(country_names.get(i, f"Unknown ({i})"))
+infected_names_str = ", ".join(infected_names) if infected_names else "Unknown"
+news = [f'Famine detected in {infected_names_str}!']
 
-if random.randint(0,2)==0:
-    news=[f'Famine detected in {country_names[random.randint(0, 57)]}!']
-else:
-    news=[f'New outbreak of {starter_disease} ({disease_type}) reported!']
 
 budget = 10000000000  # 10 billion starting budget
+MAX_PROFIT = 50_000_000  # profit per second when average health == 100%
+budget_acc = 0.0
 
 # --- Food setup ---
 hunger=100
@@ -379,30 +383,25 @@ class Popup:
             b.handle_event(event)
         return True
     
-    
-    
-popup_rect = (WIDTH//2, HEIGHT//2, 440, 240)
-popup_health = Popup(popup_rect, "Health", "Health information...", font_small)
-popup_hunger = Popup(popup_rect, "Hunger", "Hunger information...", font_small)
-popup_budget = Popup(popup_rect, "Budget: " budget, "Budget is currently stable.", font_small)
-popup_wfp   = Popup(popup_rect, "World Food Programme", "WFP information...", font_small)
-popup_fao   = Popup(popup_rect, "Food and Agriculture Organization", "FAO information...", font_small)
-
-popup_country = Popup((WIDTH//2 - 200, HEIGHT//2 - 120, 400, 200), "Country", "Info", font_small)
-close_country = make_close_button(popup_country)
-
-
-
 def make_close_button(popup):
     btn = Button((popup.rect.right - 90, popup.rect.bottom - 48, 80, 32), "Close", lambda: popup.hide())
     popup.buttons = [btn]
-    return btn
+    return btn  
+    
+popup_rect = (WIDTH//4, HEIGHT//4, 880, 440)
+popup_health = Popup(popup_rect, "Health", "Health information...", font_small)
+popup_hunger = Popup(popup_rect, "Hunger", "Hunger information...", font_small)
+popup_wfp   = Popup(popup_rect, "World Food Programme", "WFP information...", font_small)
+popup_fao   = Popup(popup_rect, "Food and Agriculture Organization", "FAO information...", font_small)
+popup_country = Popup((WIDTH//2 - 200, HEIGHT//2 - 120, 400, 200), "Country", "Info", font_small)
+
+
+
+
 close_health = make_close_button(popup_health)
 close_hunger = make_close_button(popup_hunger)
-close_budget = make_close_button(popup_budget)
 close_wfp = make_close_button(popup_wfp)
 close_fao = make_close_button(popup_fao)
-
 
 # ----------------------------------------
 #             POPUP  END
@@ -412,28 +411,90 @@ newsImg = pygame.image.load("news.png")
 newsImg = pygame.transform.scale(newsImg, (ticker_height, ticker_height))
 
 wfpButton = Button((0, HEIGHT-100, WIDTH/5, 100), "World Food Programme", lambda: None)
+#airdropButton = Button((, HEIGHT-100, WIDTH/5, 100), "Airdrop Food", lambda: None)
+
 faoButton = Button((WIDTH/5, HEIGHT-100, WIDTH/5, 100), "Food and Agriculture Organization", lambda: None)
-budgetButton = Button((2*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), "Budget", lambda: None)
 healthButton = Button((3*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), "Health", lambda: None)
 hungerButton = Button((4*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), "Hunger", lambda: None)
 
 
 wfpButton.callback = lambda pop=popup_wfp: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
-faoButton.callback = lambda pop=popup_fao: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
-budgetButton.callback = lambda pop=popup_budget: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
+faoButton.callback = lambda: (popup_fao.show(title=popup_fao.title, text=popup_fao.text, buttons=popup_fao.buttons), 
+                              )
 healthButton.callback = lambda pop=popup_health: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
 hungerButton.callback = lambda pop=popup_hunger: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
 
+def apply_action(action_name):
+    global pending_action
+    pending_action = action_name  # Set the pending action
+    
+# ...existing code...
+def apply_action_to_country(action_name, country_index):
+    if action_name == "Airdrop Food to Selected Country":
+        # Implement the logic for airdropping food
+        print(f"Airdropping food to {country_names[country_index]}")
+        # Example: Increase health or food supply
+        country_health[country_index] += 20  # Adjust as needed
+    elif action_name == "Action 2":
+        # Implement logic for Action 2
+        print(f"Applying Action 2 to {country_names[country_index]}")
+    elif action_name == "Action 3":
+        # Implement logic for Action 3
+        print(f"Applying Action 3 to {country_names[country_index]}")
+
+faobutton1 = Button((50, 100, 100, 30), "Airdrop Food to Selected Country", lambda: apply_action("Airdrop Food to Selected Country"))
+faobutton2 = Button((150, 100, 100, 30), "Action 2", lambda: apply_action("Action 2"))
+faobutton3 = Button((250, 100, 100, 30), "Action 3", lambda: apply_action("Action 3"))
+
+
+budgetButton = Button((2*(WIDTH/5), HEIGHT-100, WIDTH/5, 100), f"Budget: {budget}", lambda: None)
+popup_budget = Popup(popup_rect, f"Budget: {budget}", "Budget is currently stable.", font_small)
+budgetButton.callback = lambda pop=popup_budget: pop.show(title=pop.title, text=pop.text, buttons=pop.buttons)
 
 # --- Game loop ---
+
+
+
+
+
 running = True
 while running:
     dt = clock.tick(FPS) / 1000.0  # delta seconds
+    pending_action = None
 
     # ----------------------------------------
     #             INPUT HANDLING
     # ----------------------------------------
-    budget += 1000000 * dt  # increase budget over time for testing
+
+
+
+    #update health
+    for i in infected_countries:
+        if random.randint(0, 100)<30:
+            country_famine[i]=-1
+
+    # compute average world health (clamp 0..100) and update profit_rate accordingly
+    if country_health:
+        clamped = [max(0, min(100, h)) for h in country_health]
+        average_health = sum(clamped) / len(clamped)
+    else:
+        average_health = 100.0
+
+    # profit scales linearly: 0% -> 0, 100% -> MAX_PROFIT
+    profit_rate = int((average_health / 100.0) * MAX_PROFIT)
+
+    # apply profit per whole second using accumulator (handles fractional dt)
+    budget_acc += dt
+    if budget_acc >= 1.0:
+        secs = int(budget_acc)
+        budget += profit_rate * secs
+        budget_acc -= secs
+
+    # update popup/button labels to reflect latest values
+    popup_budget.text = f"Budget is currently stable.\nProfit rate: ${profit_rate:,}/s"
+    budgetButton.text = f"Budget: ${budget:,}"
+
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -457,8 +518,23 @@ while running:
                 idx = col.r - 1  # we encoded index+1 in red channel
                 if 0 <= idx <= MAX_ICONS:
                     name = country_names.get(idx, f"Unknown ({idx})")
-                    print(f"Clicked country: {name}")
-                
+                    
+                    if pending_action:
+                        # Apply the action to the selected country
+                        apply_action_to_country(pending_action, idx)
+                        pending_action = None  # Reset pending action
+                        print(f"Applied '{pending_action}' to {name}")
+                    else:
+                    
+                    #INPUT HEALTH VALUE AND FAMINE STATUS
+                        health_val = country_health[idx]+country_famine[idx] if idx < len(country_health) else 100
+                        famine = "Yes" if idx in infected_countries else "No"
+                        body = f"Health: {health_val}\nFamine?: {famine}"
+                    # position popup slightly offset from click so cursor doesn't cover it
+                        popup_country.show(title=name, text=body, buttons=popup_country.buttons, pos=(mx + 12, my + 12))
+                        print(f"Clicked country: {name}")
+                #INPUT HEALTH VALUE AND FAMINE STATUS ABOVE
+
             
         wfpButton.handle_event(event)
         faoButton.handle_event(event)
@@ -474,18 +550,20 @@ while running:
     news_ticker.update(dt)
 
     # infect
-    if random.randint(0, 1000)==0:
+    if random.randint(0, 300)==1:
         neighbors=countries_neighbors.get(random.choice(infected_countries))
         new_infected=random.choice(neighbors)
         if new_infected not in infected_countries:
             infected_countries.append(new_infected)
             news.append(f'Famine detected in {country_names[new_infected]}! ')
             news_ticker.refresh()
-            print("Infected countries:", infected_countries)
-    elif random.randint(0, 10000)==1:
+    elif random.randint(0, 5000)==1:
         continue
 
     #update health
+    for i in range(58):
+        if random.randint(0, 100)<30:
+            country_famine[i]= min(0, country_famine[i]-1) if i in infected_countries else max(70, country_famine[i]+1)
 
     # ----------------------------------------
     #               DRAWING
@@ -496,7 +574,7 @@ while running:
     screen.blit(newsImg, (WIDTH/4 - ticker_height, 0))
 
     for idx, overlay in enumerate(map_overlays):
-        health_val = country_health[idx] if idx < len(country_health) else 100
+        health_val = country_health[idx]+country_famine[idx] if idx < len(country_health) else 100
         # linear mapping: health 100 -> 0 alpha, health 0 -> 255 alpha
         alpha = int((100.0 - health_val) / 100.0 * 255.0)
         alpha = max(0, min(255, alpha))
@@ -528,7 +606,7 @@ while running:
 
     news_ticker.draw(screen)
     
-    for p in (popup_health, popup_hunger, popup_budget, popup_wfp, popup_fao):
+    for p in (popup_health, popup_hunger, popup_budget, popup_wfp, popup_fao,popup_country):
         p.draw(screen)
 
 
