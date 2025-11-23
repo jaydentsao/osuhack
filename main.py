@@ -24,6 +24,7 @@ animal_diseases=['Foot-and-Mouth Disease','Avian Influenza','Bovine Tuberculosis
 # --- Game board setup ---
 starter_disease=random.choice(agriculture_diseases + animal_diseases)
 disease_type="Famine Disease" if starter_disease in agriculture_diseases else "Animal Disease"
+country_of_origin=random.randint(1, 58)
 news=['New outbreak of {starter_disease} ({disease_type}) reported!']
 
 # --- Food setup ---
@@ -56,8 +57,11 @@ class Button:
 # --- Button class end
 
 # ----------------------------------------
-#             INPUT HANDLING
+#             NEWS TICKER
 # ----------------------------------------
+
+font = pygame.font.Font(None, 20)
+font_small = pygame.font.Font(None, 22)
 class NewsTicker:
     def __init__(self, rect, news_list, font, speed=80, fg=(255,255,0), bg=(0,0,0)):
         self.rect = pygame.Rect(rect)
@@ -111,12 +115,18 @@ class NewsTicker:
             surf.blit(self.surface, (x + self.surface_width, y))
 
 
+ticker_height = 30
+news_ticker = NewsTicker((0, 0, WIDTH, ticker_height), news, font_small, speed=80, fg=(255,230,0))
+# ----------------------------------------
+#             NEWS TICKER END
+# ----------------------------------------
 
 
 # --- Game loop ---
 running = True
 while running:
     clock.tick(FPS)
+    dt = clock.tick(FPS) / 1000.0  # delta seconds
 
     # ----------------------------------------
     #             INPUT HANDLING
@@ -130,7 +140,7 @@ while running:
     # ----------------------------------------
     #              GAME LOGIC
     # ----------------------------------------
-
+    news_ticker.update(dt)
 
     # ----------------------------------------
     #               DRAWING
