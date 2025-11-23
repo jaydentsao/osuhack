@@ -7,6 +7,7 @@ pygame.init()
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Starter Game Example")
+pygame.display.set_background("51101cb559791d1372e717a865d9ae39.jpg")
 
 clock = pygame.time.Clock()
 FPS = 60
